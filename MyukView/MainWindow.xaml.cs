@@ -1,122 +1,237 @@
-﻿using Microsoft.Win32;
+using Microsoft.Win32;
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using Xabe.FFmpeg;
 using Xabe.FFmpeg.Downloader;
+using MyukView.ViewModels;
+using MyukView.Services;
+using MyukView.Models;
 
 namespace MyukView
 {
     public partial class MainWindow : Window
     {
-        private string[] imageFilePaths;
-        private string videoFilePath;
-        ImageConv imageConv = new ImageConv();
-        AudioConv audioConv = new AudioConv();
+        private readonly ImageViewerViewModel _viewModel;
+        private readonly FormatConverterService _formatConverter;
+        private readonly AudioService _audioService;
+        private string[] _imageFilePaths = Array.Empty<string>();
+        private string _videoFilePath = string.Empty;
 
         public MainWindow()
         {
             InitializeComponent();
-            InitFFmpeg(); // 실행 경로 설정
+
+            // ViewModel 초기화
+            _viewModel = new ImageViewerViewModel();
+            DataContext = _viewModel;
+
+            // 서비스 초기화
+            _formatConverter = new FormatConverterService();
+            _audioService = new AudioService();
+
+            // 이벤트 연결
+            _viewModel.ZoomInRequested += (s, e) => imageViewer.ZoomIn();
+            _viewModel.ZoomOutRequested += (s, e) => imageViewer.ZoomOut();
+            _viewModel.ResetZoomRequested += (s, e) => imageViewer.ResetZoom();
+            _viewModel.RotateClockwiseRequested += (s, e) => imageViewer.RotateClockwise();
+            _viewModel.RotateCounterClockwiseRequested += (s, e) => imageViewer.RotateCounterClockwise();
+
+            // ViewModel의 CurrentImage 변경 시 컨트롤 업데이트
+            _viewModel.PropertyChanged += (s, e) =>
+            {
+                if (e.PropertyName == nameof(_viewModel.CurrentImage))
+                {
+                    imageViewer.CurrentImage = _viewModel.CurrentImage;
+                }
+            };
+
+            // FFmpeg 초기화
+            InitFFmpeg();
         }
 
         private async void InitFFmpeg()
         {
-            txtStatus.Text = "FFmpeg 다운로드 확인 중...";
             try
             {
                 await FFmpegDownloader.GetLatestVersion(FFmpegVersion.Official);
                 FFmpeg.SetExecutablesPath(FFmpeg.ExecutablesPath);
-                txtStatus.Text = "FFmpeg 준비 완료";
             }
             catch (Exception ex)
             {
-                txtStatus.Text = $"FFmpeg 오류: {ex.Message}";
-                MessageBox.Show("FFmpeg 다운로드 또는 설정에 실패했습니다.\n인터넷 연결 확인 또는 수동 설정 필요", "FFmpeg 오류");
+                MessageBox.Show($"FFmpeg 다운로드 또는 설정에 실패했습니다.\n오류: {ex.Message}",
+                    "FFmpeg 오류", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
 
-        #region 이미지 변환 관련
+        #region 메뉴 이벤트
 
-        private void btnLoadImage_Click(object sender, RoutedEventArgs e)
+        private void MenuExit_Click(object sender, RoutedEventArgs e)
         {
-            OpenFileDialog openFileDialog = new OpenFileDialog
+            Application.Current.Shutdown();
+        }
+
+        private void MenuFormatConverter_Click(object sender, RoutedEventArgs e)
+        {
+            mainTabControl.SelectedItem = tabFormatConverter;
+        }
+
+        private void MenuVideoProcessing_Click(object sender, RoutedEventArgs e)
+        {
+            mainTabControl.SelectedItem = tabVideoProcessing;
+        }
+
+        #endregion
+
+        #region 탭 변경 이벤트
+
+        private void MainTabControl_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            // 탭이 변경될 때 필요한 처리
+        }
+
+        #endregion
+
+        #region 포맷 변환 탭
+
+        private void btnLoadImages_Click(object sender, RoutedEventArgs e)
+        {
+            var dialog = new OpenFileDialog
             {
-                Filter = "Image Files|*.avif;*.webp;*.tiff;*.bmp;*.jpg;*.jpeg;*.png;*.gif",
+                Title = "이미지 파일 선택",
+                Filter = "이미지 파일|*.avif;*.webp;*.tiff;*.bmp;*.jpg;*.jpeg;*.png;*.gif|모든 파일|*.*",
                 Multiselect = true
             };
 
-            if (openFileDialog.ShowDialog() == true)
+            if (dialog.ShowDialog() == true)
             {
-                imageFilePaths = openFileDialog.FileNames;
-                txtImageStatus.Text = $"{imageFilePaths.Length}개의 파일이 로드되었습니다.";
+                _imageFilePaths = dialog.FileNames;
+                txtFileCount.Text = $"선택된 파일: {_imageFilePaths.Length}개";
+                txtConversionStatus.Text = $"{_imageFilePaths.Length}개의 파일이 로드되었습니다.\n변환 설정을 지정한 후 '변환 시작'을 클릭하세요.";
             }
         }
 
-        private void btnConvertImage_Click(object sender, RoutedEventArgs e)
+        private async void btnConvertFormat_Click(object sender, RoutedEventArgs e)
         {
-            if (imageFilePaths == null || imageFilePaths.Length == 0)
+            if (_imageFilePaths == null || _imageFilePaths.Length == 0)
             {
-                MessageBox.Show("먼저 이미지 파일을 불러오세요.");
+                MessageBox.Show("먼저 이미지 파일을 불러오세요.", "알림",
+                    MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
 
+            btnConvertFormat.IsEnabled = false;
+            progressBar.Visibility = Visibility.Visible;
+            progressBar.Value = 0;
+
             try
             {
-                foreach (var path in imageFilePaths)
+                var targetFormat = ((ComboBoxItem)cmbTargetFormat.SelectedItem).Content.ToString()?.ToLower() ?? "png";
+                int quality = (int)sliderQuality.Value;
+
+                var statusBuilder = new StringBuilder();
+                statusBuilder.AppendLine($"변환 시작: {_imageFilePaths.Length}개 파일");
+                statusBuilder.AppendLine($"대상 포맷: {targetFormat.ToUpper()}, 품질: {quality}");
+                statusBuilder.AppendLine();
+
+                for (int i = 0; i < _imageFilePaths.Length; i++)
                 {
-                    imageConv.ConvertAvifToPng(path);
+                    string inputPath = _imageFilePaths[i];
+                    try
+                    {
+                        string outputPath;
+                        if (targetFormat == "png")
+                        {
+                            outputPath = await _formatConverter.ConvertToPngAsync(inputPath);
+                        }
+                        else
+                        {
+                            outputPath = await _formatConverter.ConvertToFormatAsync(inputPath, targetFormat, quality);
+                        }
+
+                        statusBuilder.AppendLine($"✓ {Path.GetFileName(inputPath)} → {Path.GetFileName(outputPath)}");
+                        progressBar.Value = ((i + 1) * 100.0) / _imageFilePaths.Length;
+                    }
+                    catch (Exception ex)
+                    {
+                        statusBuilder.AppendLine($"✗ {Path.GetFileName(inputPath)}: {ex.Message}");
+                    }
+
+                    txtConversionStatus.Text = statusBuilder.ToString();
                 }
-                string msg = $"{imageFilePaths.Length}개의 파일이 PNG로 변환되었습니다.";
-                txtImageStatus.Text = msg;
-                MessageBox.Show(msg);
+
+                statusBuilder.AppendLine();
+                statusBuilder.AppendLine("변환 완료!");
+                txtConversionStatus.Text = statusBuilder.ToString();
+
+                MessageBox.Show($"{_imageFilePaths.Length}개 파일 변환 완료!", "완료",
+                    MessageBoxButton.OK, MessageBoxImage.Information);
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"이미지 변환 중 오류 발생: {ex.Message}");
+                MessageBox.Show($"변환 중 오류 발생: {ex.Message}", "오류",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                btnConvertFormat.IsEnabled = true;
+                progressBar.Visibility = Visibility.Collapsed;
             }
         }
 
         #endregion
 
-        #region 영상 처리 및 Whisper 관련
+        #region 영상 처리 탭
 
         private void btnLoadVideo_Click(object sender, RoutedEventArgs e)
         {
-            OpenFileDialog ofd = new OpenFileDialog
+            var dialog = new OpenFileDialog
             {
-                Filter = "Video Files|*.mp4;*.mov;*.avi"
+                Title = "영상 파일 선택",
+                Filter = "영상 파일|*.mp4;*.mov;*.avi;*.mkv;*.wmv|모든 파일|*.*"
             };
 
-            if (ofd.ShowDialog() == true)
+            if (dialog.ShowDialog() == true)
             {
-                videoFilePath = ofd.FileName;
-                txtStatus.Text = $"영상 파일 선택됨: {videoFilePath}";
+                _videoFilePath = dialog.FileName;
+                txtVideoFileName.Text = Path.GetFileName(_videoFilePath);
             }
         }
 
         private async void btnExtractAudio_Click(object sender, RoutedEventArgs e)
         {
-            if (string.IsNullOrEmpty(videoFilePath))
+            if (string.IsNullOrEmpty(_videoFilePath) || !File.Exists(_videoFilePath))
             {
-                MessageBox.Show("먼저 영상 파일을 불러오세요.");
+                MessageBox.Show("먼저 영상 파일을 불러오세요.", "알림",
+                    MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
 
-            txtStatus.Text = "M4A 추출 중...";
+            btnExtractAudio.IsEnabled = false;
+            progressBar.Visibility = Visibility.Visible;
+            progressBar.Value = 0;
 
             try
             {
-                progressBar.Value = 0;
-                btnExtractAudio.IsEnabled = false;
+                // 설정 가져오기
+                var codecItem = ((ComboBoxItem)cmbCodec.SelectedItem).Content.ToString() ?? "AAC";
+                string codec = codecItem switch
+                {
+                    "AAC" => "aac",
+                    "MP3 (libmp3lame)" => "libmp3lame",
+                    "FLAC" => "flac",
+                    _ => "aac"
+                };
 
-                var codec = ((ComboBoxItem)cmbCodec.SelectedItem).Content.ToString();
-                var ext = ((ComboBoxItem)cmbOutputExt.SelectedItem).Content.ToString();
-                int bitrate = int.Parse(((ComboBoxItem)cmbBitrate.SelectedItem).Content.ToString());
+                var bitrateItem = ((ComboBoxItem)cmbBitrate.SelectedItem).Content.ToString() ?? "192 kbps";
+                int bitrate = int.Parse(bitrateItem.Replace(" kbps", ""));
+
+                var ext = ((ComboBoxItem)cmbOutputExt.SelectedItem).Content.ToString() ?? ".m4a";
 
                 var settings = new AudioSettings
                 {
@@ -125,111 +240,131 @@ namespace MyukView
                     Extension = ext
                 };
 
-                // 진행률 전달
-                string output = await audioConv.ExtractAudioAsync(videoFilePath, settings, percent =>
+                // 진행률 콜백
+                string outputPath = await _audioService.ExtractAudioAsync(_videoFilePath, settings, percent =>
                 {
                     Dispatcher.Invoke(() =>
                     {
                         progressBar.Value = percent;
-                        txtStatus.Text = $"진행률: {percent:0.0}%";
                     });
                 });
 
-                txtStatus.Text = $"M4A 추출 완료: {output}";
                 progressBar.Value = 100;
+                MessageBox.Show($"음성 추출 완료!\n{outputPath}", "완료",
+                    MessageBoxButton.OK, MessageBoxImage.Information);
 
-                // 변환 완료 후
-                btnExtractAudio.IsEnabled = true;
-
-                string folder = Path.GetDirectoryName(output);
-                if (Directory.Exists(folder))
+                // 출력 폴더 열기
+                string? folder = Path.GetDirectoryName(outputPath);
+                if (!string.IsNullOrEmpty(folder) && Directory.Exists(folder))
                 {
                     Process.Start("explorer.exe", folder);
                 }
             }
             catch (Exception ex)
             {
-                txtStatus.Text = "오류 발생";
-                MessageBox.Show($"오류: {ex.Message}");
-
-                // 변환 완료 후
+                MessageBox.Show($"음성 추출 중 오류 발생: {ex.Message}", "오류",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
                 btnExtractAudio.IsEnabled = true;
+                progressBar.Visibility = Visibility.Collapsed;
             }
         }
 
         private async void btnExtractText_Click(object sender, RoutedEventArgs e)
         {
-            // 오디오 파일 경로 (M4A)가 존재해야 함.
-            var audioPath = Path.ChangeExtension(videoFilePath, ".m4a");
-            if (!File.Exists(audioPath))
+            // 오디오 파일 경로 확인
+            if (string.IsNullOrEmpty(_videoFilePath))
             {
-                MessageBox.Show("먼저 음성 추출을 진행하세요.");
+                MessageBox.Show("먼저 영상 파일을 선택하고 음성을 추출하세요.", "알림",
+                    MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
 
-            string model = ((ComboBoxItem)cmbModel.SelectedItem).Content.ToString();
-            bool timestamp = chkTimestamp.IsChecked == true;
-            bool speaker = chkSpeaker.IsChecked == true;
-            bool markdown = chkMarkdown.IsChecked == true;
-
-            // 파이썬 스크립트의 인자 구성
-            var argsBuilder = new StringBuilder();
-            argsBuilder.Append($"\"scripts\\whisper_run.py\" \"{audioPath}\" {model}");
-            if (timestamp) argsBuilder.Append(" --timestamp");
-            if (speaker) argsBuilder.Append(" --speaker");
-            if (markdown) argsBuilder.Append(" --markdown");
-
-            string args = argsBuilder.ToString();
-            string pythonExe = @"C:\Path\To\python.exe"; // 환경에 맞게 수정
-
-            txtStatus.Text = "로컬 Whisper 실행 중...";
-            progressBar.Value = 0;
-
-            var psi = new ProcessStartInfo
+            var audioPath = Path.ChangeExtension(_videoFilePath, ".m4a");
+            if (!File.Exists(audioPath))
             {
-                FileName = pythonExe,
-                Arguments = args,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true
-            };
-
-            var process = new Process { StartInfo = psi };
-            var outputBuilder = new StringBuilder();
-
-            process.OutputDataReceived += (s, ea) =>
-            {
-                if (!string.IsNullOrEmpty(ea.Data))
-                {
-                    Dispatcher.Invoke(() => txtStatus.Text = ea.Data);
-                    outputBuilder.AppendLine(ea.Data);
-                }
-            };
-            process.ErrorDataReceived += (s, ea) =>
-            {
-                if (!string.IsNullOrEmpty(ea.Data))
-                {
-                    outputBuilder.AppendLine(ea.Data);
-                }
-            };
-
-            process.Start();
-            process.BeginOutputReadLine();
-            process.BeginErrorReadLine();
-
-            await Task.Run(() => process.WaitForExit());
-
-            txtStatus.Text = "텍스트 추출 완료";
-
-            var transcriptPath = Path.ChangeExtension(audioPath, ".txt");
-            if (File.Exists(transcriptPath))
-            {
-                txtTranscript.Text = File.ReadAllText(transcriptPath);
+                MessageBox.Show("먼저 음성 추출을 진행하세요.", "알림",
+                    MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
             }
-            else
+
+            btnExtractText.IsEnabled = false;
+
+            try
             {
-                txtTranscript.Text = "텍스트 파일을 찾을 수 없습니다.";
+                string model = ((ComboBoxItem)cmbModel.SelectedItem).Content.ToString() ?? "base";
+                bool timestamp = chkTimestamp.IsChecked == true;
+                bool speaker = chkSpeaker.IsChecked == true;
+                bool markdown = chkMarkdown.IsChecked == true;
+
+                // 파이썬 스크립트 인자 구성
+                var argsBuilder = new StringBuilder();
+                argsBuilder.Append($"\"scripts\\whisper_run.py\" \"{audioPath}\" {model}");
+                if (timestamp) argsBuilder.Append(" --timestamp");
+                if (speaker) argsBuilder.Append(" --speaker");
+                if (markdown) argsBuilder.Append(" --markdown");
+
+                string args = argsBuilder.ToString();
+                string pythonExe = @"C:\Path\To\python.exe"; // 환경에 맞게 수정 필요
+
+                var psi = new ProcessStartInfo
+                {
+                    FileName = pythonExe,
+                    Arguments = args,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+
+                var process = new Process { StartInfo = psi };
+                var outputBuilder = new StringBuilder();
+
+                process.OutputDataReceived += (s, ea) =>
+                {
+                    if (!string.IsNullOrEmpty(ea.Data))
+                    {
+                        outputBuilder.AppendLine(ea.Data);
+                    }
+                };
+
+                process.ErrorDataReceived += (s, ea) =>
+                {
+                    if (!string.IsNullOrEmpty(ea.Data))
+                    {
+                        outputBuilder.AppendLine(ea.Data);
+                    }
+                };
+
+                process.Start();
+                process.BeginOutputReadLine();
+                process.BeginErrorReadLine();
+
+                await Task.Run(() => process.WaitForExit());
+
+                // 결과 텍스트 로드
+                var transcriptPath = Path.ChangeExtension(audioPath, ".txt");
+                if (File.Exists(transcriptPath))
+                {
+                    txtTranscript.Text = File.ReadAllText(transcriptPath);
+                    MessageBox.Show("텍스트 추출 완료!", "완료",
+                        MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+                else
+                {
+                    txtTranscript.Text = "텍스트 파일을 찾을 수 없습니다.\n\n" + outputBuilder.ToString();
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"텍스트 추출 중 오류 발생: {ex.Message}", "오류",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                btnExtractText.IsEnabled = true;
             }
         }
 
@@ -237,26 +372,24 @@ namespace MyukView
         {
             if (string.IsNullOrWhiteSpace(txtTranscript.Text))
             {
-                MessageBox.Show("저장할 텍스트가 없습니다.");
+                MessageBox.Show("저장할 텍스트가 없습니다.", "알림",
+                    MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
 
-            SaveFileDialog sfd = new SaveFileDialog
+            var dialog = new SaveFileDialog
             {
+                Title = "텍스트 저장",
                 Filter = "텍스트 파일|*.txt|마크다운 파일|*.md|자막 파일 (SRT)|*.srt",
                 FileName = "transcription"
             };
 
-            if (sfd.ShowDialog() == true)
+            if (dialog.ShowDialog() == true)
             {
-                File.WriteAllText(sfd.FileName, txtTranscript.Text);
-                MessageBox.Show("텍스트 저장 완료");
+                File.WriteAllText(dialog.FileName, txtTranscript.Text);
+                MessageBox.Show("텍스트 저장 완료!", "완료",
+                    MessageBoxButton.OK, MessageBoxImage.Information);
             }
-        }
-
-        private void MenuExit_Click(object sender, RoutedEventArgs e)
-        {
-            Application.Current.Shutdown();
         }
 
         #endregion

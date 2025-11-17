@@ -1,0 +1,62 @@
+<UserControl x:Class="MyukView.Controls.ZoomableImageControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             mc:Ignorable="d"
+             d:DesignHeight="450" d:DesignWidth="800"
+             Background="#1E1E1E">
+    <Grid>
+        <ScrollViewer x:Name="scrollViewer"
+                      HorizontalScrollBarVisibility="Auto"
+                      VerticalScrollBarVisibility="Auto"
+                      Background="Transparent">
+            <Grid x:Name="imageGrid">
+                <Image x:Name="imageControl"
+                       Stretch="Uniform"
+                       RenderOptions.BitmapScalingMode="HighQuality"
+                       MouseWheel="Image_MouseWheel"
+                       MouseLeftButtonDown="Image_MouseLeftButtonDown"
+                       MouseLeftButtonUp="Image_MouseLeftButtonUp"
+                       MouseMove="Image_MouseMove"
+                       MouseLeave="Image_MouseLeave">
+                    <Image.RenderTransform>
+                        <TransformGroup>
+                            <ScaleTransform x:Name="scaleTransform"/>
+                            <TranslateTransform x:Name="translateTransform"/>
+                            <RotateTransform x:Name="rotateTransform" CenterX="0.5" CenterY="0.5"/>
+                        </TransformGroup>
+                    </Image.RenderTransform>
+                </Image>
+            </Grid>
+        </ScrollViewer>
+
+        <!-- 확대/축소 정보 오버레이 -->
+        <Border Background="#AA000000"
+                CornerRadius="5"
+                Padding="10,5"
+                HorizontalAlignment="Right"
+                VerticalAlignment="Top"
+                Margin="10"
+                Visibility="{Binding ElementName=zoomInfoText, Path=Visibility}">
+            <TextBlock x:Name="zoomInfoText"
+                       Foreground="White"
+                       FontSize="14"
+                       Visibility="Collapsed"/>
+        </Border>
+
+        <!-- 이미지 정보 오버레이 -->
+        <Border Background="#AA000000"
+                CornerRadius="5"
+                Padding="10,5"
+                HorizontalAlignment="Left"
+                VerticalAlignment="Bottom"
+                Margin="10"
+                Visibility="{Binding ElementName=imageInfoText, Path=Visibility}">
+            <TextBlock x:Name="imageInfoText"
+                       Foreground="White"
+                       FontSize="12"
+                       Visibility="Collapsed"/>
+        </Border>
+    </Grid>
+</UserControl>
