@@ -20,8 +20,11 @@ namespace MyukView
         private readonly ImageViewerViewModel _viewModel;
         private readonly FormatConverterService _formatConverter;
         private readonly AudioService _audioService;
+        private readonly ImageProcessingService _imageProcessor;
         private string[] _imageFilePaths = Array.Empty<string>();
         private string _videoFilePath = string.Empty;
+        private WindowState _previousWindowState;
+        private WindowStyle _previousWindowStyle;
 
         public MainWindow()
         {
@@ -34,6 +37,7 @@ namespace MyukView
             // 서비스 초기화
             _formatConverter = new FormatConverterService();
             _audioService = new AudioService();
+            _imageProcessor = new ImageProcessingService();
 
             // 이벤트 연결
             _viewModel.ZoomInRequested += (s, e) => imageViewer.ZoomIn();
