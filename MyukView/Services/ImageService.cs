@@ -14,11 +14,13 @@ namespace MyukView.Services
     public class ImageService
     {
         private readonly Dictionary<string, BitmapImage> _imageCache;
+        private readonly MotionPhotoService _motionPhotoService;
         private const int MAX_CACHE_SIZE = 20; // 최대 캐시 개수
 
         public ImageService()
         {
             _imageCache = new Dictionary<string, BitmapImage>();
+            _motionPhotoService = new MotionPhotoService();
         }
 
         /// <summary>
@@ -146,6 +148,17 @@ namespace MyukView.Services
                 catch
                 {
                     // EXIF 데이터가 없거나 읽을 수 없는 경우 무시
+                }
+
+                // Motion Photo 확인
+                if (_motionPhotoService.IsMotionPhoto(filePath))
+                {
+                    metadata.IsMotionPhoto = true;
+                    var motionInfo = _motionPhotoService.GetMotionPhotoInfo(filePath);
+                    if (motionInfo != null)
+                    {
+                        metadata.VideoSize = motionInfo.VideoSize;
+                    }
                 }
 
                 return metadata;

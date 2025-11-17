@@ -26,7 +26,11 @@ namespace MyukView
         private WindowState _previousWindowState;
         private WindowStyle _previousWindowStyle;
 
-        public MainWindow()
+        public MainWindow() : this(null)
+        {
+        }
+
+        public MainWindow(string? initialFilePath)
         {
             InitializeComponent();
 
@@ -57,6 +61,29 @@ namespace MyukView
 
             // FFmpeg 초기화
             InitFFmpeg();
+
+            // 초기 파일이 지정된 경우 로드
+            if (!string.IsNullOrEmpty(initialFilePath) && File.Exists(initialFilePath))
+            {
+                LoadInitialFile(initialFilePath);
+            }
+        }
+
+        private async void LoadInitialFile(string filePath)
+        {
+            try
+            {
+                // 이미지 뷰어 탭으로 전환
+                mainTabControl.SelectedIndex = 0;
+
+                // 파일이 있는 폴더의 모든 이미지 로드
+                await _viewModel.OpenImageAsync(filePath);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"파일 열기 실패: {ex.Message}", "오류",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
 
         private async void InitFFmpeg()

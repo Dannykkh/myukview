@@ -23,6 +23,11 @@ namespace MyukView.Models
         public string? ExposureTime { get; set; }
         public int? ISO { get; set; }
 
+        // Motion Photo 정보
+        public bool IsMotionPhoto { get; set; }
+        public long? VideoSize { get; set; }
+        public string? ExtractedVideoPath { get; set; }
+
         /// <summary>
         /// 이미지 해상도를 문자열로 반환
         /// </summary>
