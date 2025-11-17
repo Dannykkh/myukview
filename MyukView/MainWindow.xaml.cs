@@ -393,5 +393,84 @@ namespace MyukView
         }
 
         #endregion
+
+        #region 새 기능 메뉴 이벤트
+
+        private async void MenuCrop_Click(object sender, RoutedEventArgs e)
+        {
+            if (_viewModel.CurrentImage == null)
+            {
+                MessageBox.Show("먼저 이미지를 선택하세요.", "알림",
+                    MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            var cropWindow = new CropWindow(_viewModel.CurrentImage);
+            if (cropWindow.ShowDialog() == true && cropWindow.IsApplied)
+            {
+                try
+                {
+                    var cropArea = cropWindow.CropArea;
+                    string currentPath = _viewModel.CurrentImageFile?.FilePath ?? "";
+
+                    if (!string.IsNullOrEmpty(currentPath))
+                    {
+                        string outputPath = await _imageProcessor.CropImageAsync(currentPath,
+                            (int)cropArea.X, (int)cropArea.Y, (int)cropArea.Width, (int)cropArea.Height);
+
+                        MessageBox.Show($"자르기 완료!\n{Path.GetFileName(outputPath)}", "완료",
+                            MessageBoxButton.OK, MessageBoxImage.Information);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"자르기 중 오류 발생: {ex.Message}", "오류",
+                        MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            }
+        }
+
+        private void MenuSlideshow_Click(object sender, RoutedEventArgs e)
+        {
+            if (_viewModel.ImageFiles.Count == 0)
+            {
+                MessageBox.Show("이미지가 없습니다.", "알림",
+                    MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            var slideshowWindow = new SlideshowWindow(
+                _viewModel.ImageFiles.ToList(),
+                _viewModel.CurrentImageIndex,
+                3 // 3초 간격
+            );
+            slideshowWindow.ShowDialog();
+        }
+
+        private void MenuFullscreen_Click(object sender, RoutedEventArgs e)
+        {
+            if (WindowState == WindowState.Maximized && WindowStyle == WindowStyle.None)
+            {
+                // 전체화면 해제
+                WindowState = _previousWindowState;
+                WindowStyle = _previousWindowStyle;
+            }
+            else
+            {
+                // 전체화면
+                _previousWindowState = WindowState;
+                _previousWindowStyle = WindowStyle;
+                WindowStyle = WindowStyle.None;
+                WindowState = WindowState.Maximized;
+            }
+        }
+
+        private void MenuToggleThumbnails_Click(object sender, RoutedEventArgs e)
+        {
+            thumbnailPanel.Visibility = menuShowThumbnails.IsChecked ?
+                Visibility.Visible : Visibility.Collapsed;
+        }
+
+        #endregion
     }
 }

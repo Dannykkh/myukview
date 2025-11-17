@@ -15,6 +15,8 @@
         <KeyBinding Key="Add" Modifiers="Control" Command="{Binding ZoomInCommand}"/>
         <KeyBinding Key="Subtract" Modifiers="Control" Command="{Binding ZoomOutCommand}"/>
         <KeyBinding Key="D0" Modifiers="Control" Command="{Binding ResetZoomCommand}"/>
+        <KeyBinding Key="F11" Command="{Binding ToggleFullscreenCommand}"/>
+        <KeyBinding Key="F5" Command="{Binding SlideshowCommand}"/>
     </Window.InputBindings>
 
     <DockPanel>
@@ -33,8 +35,15 @@
                 <Separator/>
                 <MenuItem Header="시계방향 회전(_R)" Command="{Binding RotateClockwiseCommand}"/>
                 <MenuItem Header="반시계방향 회전(_L)" Command="{Binding RotateCounterClockwiseCommand}"/>
+                <Separator/>
+                <MenuItem Header="슬라이드쇼(_S)" Click="MenuSlideshow_Click" InputGestureText="F5"/>
+                <MenuItem Header="전체화면(_F)" Click="MenuFullscreen_Click" InputGestureText="F11"/>
+                <Separator/>
+                <MenuItem Header="썸네일 패널 표시" Click="MenuToggleThumbnails_Click" IsCheckable="True" IsChecked="True" Name="menuShowThumbnails"/>
             </MenuItem>
             <MenuItem Header="도구(_T)">
+                <MenuItem Header="이미지 편집" Click="MenuImageEditor_Click"/>
+                <MenuItem Header="자르기" Click="MenuCrop_Click"/>
                 <MenuItem Header="포맷 변환" Click="MenuFormatConverter_Click"/>
                 <MenuItem Header="영상 처리" Click="MenuVideoProcessing_Click"/>
             </MenuItem>
@@ -58,6 +67,7 @@
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
                     <!-- 툴바 -->
@@ -74,10 +84,18 @@
                         <Separator/>
                         <Button Content="↻" Command="{Binding RotateClockwiseCommand}" ToolTip="시계방향 회전"/>
                         <Button Content="↺" Command="{Binding RotateCounterClockwiseCommand}" ToolTip="반시계방향 회전"/>
+                        <Separator/>
+                        <Button Content="✂" Click="MenuCrop_Click" ToolTip="자르기"/>
+                        <Button Content="▶" Click="MenuSlideshow_Click" ToolTip="슬라이드쇼 (F5)"/>
+                        <Button Content="⛶" Click="MenuFullscreen_Click" ToolTip="전체화면 (F11)"/>
                     </ToolBar>
 
                     <!-- 이미지 뷰어 컨트롤 -->
                     <controls:ZoomableImageControl x:Name="imageViewer" Grid.Row="1"/>
+
+                    <!-- 썸네일 패널 -->
+                    <controls:ThumbnailPanel x:Name="thumbnailPanel" Grid.Row="2" Height="150"
+                                            Visibility="Visible"/>
                 </Grid>
             </TabItem>
 

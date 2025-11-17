@@ -1,0 +1,27 @@
+<Window x:Class="MyukView.Windows.CropWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="clr-namespace:MyukView.Controls"
+        Title="이미지 자르기" Height="600" Width="800"
+        WindowStartupLocation="CenterScreen"
+        Background="#1E1E1E">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- 자르기 컨트롤 -->
+        <controls:CropControl x:Name="cropControl" Grid.Row="0"/>
+
+        <!-- 버튼 영역 -->
+        <Border Grid.Row="1" Background="#2D2D30" Padding="10">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button Content="적용" Click="btnApply_Click" Width="100" Height="30" Margin="0,0,10,0"
+                        Background="#007ACC" Foreground="White" BorderThickness="0"/>
+                <Button Content="취소" Click="btnCancel_Click" Width="100" Height="30"
+                        Background="#555555" Foreground="White" BorderThickness="0"/>
+            </StackPanel>
+        </Border>
+    </Grid>
+</Window>
