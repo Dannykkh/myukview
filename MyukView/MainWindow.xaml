@@ -1,33 +1,107 @@
-﻿<Window x:Class="MyukView.MainWindow"
+<Window x:Class="MyukView.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="MyukView" Height="600" Width="800">
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:controls="clr-namespace:MyukView.Controls"
+        mc:Ignorable="d"
+        Title="MyukView - 이미지 뷰어" Height="700" Width="1000"
+        WindowStartupLocation="CenterScreen">
+
+    <Window.InputBindings>
+        <KeyBinding Key="O" Modifiers="Control" Command="{Binding OpenImageCommand}"/>
+        <KeyBinding Key="Right" Command="{Binding NextImageCommand}"/>
+        <KeyBinding Key="Left" Command="{Binding PreviousImageCommand}"/>
+        <KeyBinding Key="Add" Modifiers="Control" Command="{Binding ZoomInCommand}"/>
+        <KeyBinding Key="Subtract" Modifiers="Control" Command="{Binding ZoomOutCommand}"/>
+        <KeyBinding Key="D0" Modifiers="Control" Command="{Binding ResetZoomCommand}"/>
+        <KeyBinding Key="F11" Command="{Binding ToggleFullscreenCommand}"/>
+        <KeyBinding Key="F5" Command="{Binding SlideshowCommand}"/>
+    </Window.InputBindings>
+
     <DockPanel>
-        <!-- 상단 메뉴 (필요 시 추가로 메뉴바 구현 가능) -->
+        <!-- 메뉴 바 -->
         <Menu DockPanel.Dock="Top">
-            <MenuItem Header="파일">
-                <MenuItem Header="종료" Click="MenuExit_Click"/>
+            <MenuItem Header="파일(_F)">
+                <MenuItem Header="이미지 열기(_O)..." Command="{Binding OpenImageCommand}" InputGestureText="Ctrl+O"/>
+                <MenuItem Header="폴더 열기(_F)..." Command="{Binding OpenFolderCommand}"/>
+                <Separator/>
+                <MenuItem Header="종료(_X)" Click="MenuExit_Click"/>
+            </MenuItem>
+            <MenuItem Header="보기(_V)">
+                <MenuItem Header="확대(_I)" Command="{Binding ZoomInCommand}" InputGestureText="Ctrl++"/>
+                <MenuItem Header="축소(_O)" Command="{Binding ZoomOutCommand}" InputGestureText="Ctrl+-"/>
+                <MenuItem Header="실제 크기(_A)" Command="{Binding ResetZoomCommand}" InputGestureText="Ctrl+0"/>
+                <Separator/>
+                <MenuItem Header="시계방향 회전(_R)" Command="{Binding RotateClockwiseCommand}"/>
+                <MenuItem Header="반시계방향 회전(_L)" Command="{Binding RotateCounterClockwiseCommand}"/>
+                <Separator/>
+                <MenuItem Header="슬라이드쇼(_S)" Click="MenuSlideshow_Click" InputGestureText="F5"/>
+                <MenuItem Header="전체화면(_F)" Click="MenuFullscreen_Click" InputGestureText="F11"/>
+                <Separator/>
+                <MenuItem Header="썸네일 패널 표시" Click="MenuToggleThumbnails_Click" IsCheckable="True" IsChecked="True" Name="menuShowThumbnails"/>
+            </MenuItem>
+            <MenuItem Header="도구(_T)">
+                <MenuItem Header="이미지 편집" Click="MenuImageEditor_Click"/>
+                <MenuItem Header="자르기" Click="MenuCrop_Click"/>
+                <MenuItem Header="포맷 변환" Click="MenuFormatConverter_Click"/>
+                <MenuItem Header="영상 처리" Click="MenuVideoProcessing_Click"/>
             </MenuItem>
         </Menu>
 
-        <!-- TabControl: 이미지 변환과 영상 처리 영역 분리 -->
-        <TabControl DockPanel.Dock="Top">
-            <!-- 이미지 변환 탭 -->
-            <TabItem Header="이미지 변환">
-                <Grid Margin="10">
-                    <StackPanel>
-                        <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
-                            <Button Name="btnLoadImage" Content="이미지 파일 불러오기" Width="150" Height="30" Click="btnLoadImage_Click" Margin="0,0,10,0"/>
-                            <Button Name="btnConvertImage" Content="PNG로 변환" Width="150" Height="30" Click="btnConvertImage_Click"/>
-                        </StackPanel>
-                        <TextBlock Name="txtImageStatus" Text="이미지 작업 상태 표시" Margin="0,0,0,10"/>
-                    </StackPanel>
+        <!-- 상태 바 -->
+        <StatusBar DockPanel.Dock="Bottom" Height="30">
+            <StatusBarItem>
+                <TextBlock Text="{Binding StatusText}" FontSize="12"/>
+            </StatusBarItem>
+            <StatusBarItem HorizontalAlignment="Right">
+                <ProgressBar x:Name="progressBar" Width="200" Height="20" Minimum="0" Maximum="100" Visibility="Collapsed"/>
+            </StatusBarItem>
+        </StatusBar>
+
+        <!-- 메인 콘텐츠 -->
+        <TabControl x:Name="mainTabControl" SelectionChanged="MainTabControl_SelectionChanged">
+            <!-- 이미지 뷰어 탭 -->
+            <TabItem Header="이미지 뷰어" Name="tabImageViewer">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- 툴바 -->
+                    <ToolBar Grid.Row="0" ToolBarTray.IsLocked="True">
+                        <Button Content="열기" Command="{Binding OpenImageCommand}" ToolTip="이미지 파일 열기 (Ctrl+O)"/>
+                        <Button Content="폴더" Command="{Binding OpenFolderCommand}" ToolTip="폴더 열기"/>
+                        <Separator/>
+                        <Button Content="◀" Command="{Binding PreviousImageCommand}" ToolTip="이전 이미지 (←)"/>
+                        <Button Content="▶" Command="{Binding NextImageCommand}" ToolTip="다음 이미지 (→)"/>
+                        <Separator/>
+                        <Button Content="+" Command="{Binding ZoomInCommand}" ToolTip="확대 (Ctrl++)"/>
+                        <Button Content="-" Command="{Binding ZoomOutCommand}" ToolTip="축소 (Ctrl+-)"/>
+                        <Button Content="⊡" Command="{Binding ResetZoomCommand}" ToolTip="실제 크기 (Ctrl+0)"/>
+                        <Separator/>
+                        <Button Content="↻" Command="{Binding RotateClockwiseCommand}" ToolTip="시계방향 회전"/>
+                        <Button Content="↺" Command="{Binding RotateCounterClockwiseCommand}" ToolTip="반시계방향 회전"/>
+                        <Separator/>
+                        <Button Content="✂" Click="MenuCrop_Click" ToolTip="자르기"/>
+                        <Button Content="▶" Click="MenuSlideshow_Click" ToolTip="슬라이드쇼 (F5)"/>
+                        <Button Content="⛶" Click="MenuFullscreen_Click" ToolTip="전체화면 (F11)"/>
+                    </ToolBar>
+
+                    <!-- 이미지 뷰어 컨트롤 -->
+                    <controls:ZoomableImageControl x:Name="imageViewer" Grid.Row="1"/>
+
+                    <!-- 썸네일 패널 -->
+                    <controls:ThumbnailPanel x:Name="thumbnailPanel" Grid.Row="2" Height="150"
+                                            Visibility="Visible"/>
                 </Grid>
             </TabItem>
 
-            <!-- 영상 처리 탭 -->
-            <TabItem Header="영상 처리">
-                <Grid Margin="10">
+            <!-- 포맷 변환 탭 -->
+            <TabItem Header="포맷 변환" Name="tabFormatConverter">
+                <Grid Margin="20">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
@@ -35,80 +109,156 @@
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
 
-                    <!-- 영상 파일 불러오기 및 음성 추출 -->
-                    <StackPanel Orientation="Horizontal" Grid.Row="0" Margin="0,0,0,10">
-                        <Button Name="btnLoadVideo" Content="영상 파일 불러오기" Width="150" Height="30" Click="btnLoadVideo_Click" Margin="0,0,10,0"/>
-                        <Button Name="btnExtractAudio" Content="M4A 추출" Width="150" Height="30" Click="btnExtractAudio_Click"/>
+                    <TextBlock Grid.Row="0" Text="이미지 포맷 변환" FontSize="18" FontWeight="Bold" Margin="0,0,0,20"/>
 
-                        <GroupBox Header="오디오 변환 설정" Margin="0,10,0,0">
-                            <StackPanel Margin="10">
-                                <StackPanel Orientation="Horizontal" Margin="0,5,0,0">
-                                    <TextBlock Text="코덱 선택:" Width="80" VerticalAlignment="Center"/>
-                                    <ComboBox x:Name="cmbCodec" Width="150">
-                                        <ComboBoxItem Content="aac" IsSelected="True"/>
-                                        <ComboBoxItem Content="libmp3lame"/>
-                                        <ComboBoxItem Content="flac"/>
-                                    </ComboBox>
-                                </StackPanel>
-
-                                <StackPanel Orientation="Horizontal" Margin="0,5,0,0">
-                                    <TextBlock Text="비트레이트:" Width="80" VerticalAlignment="Center"/>
-                                    <ComboBox x:Name="cmbBitrate" Width="80" ToolTip="오디오 품질을 설정하세요 (kbps)">
-                                        <ComboBoxItem Content="64"/>
-                                        <ComboBoxItem Content="96"/>
-                                        <ComboBoxItem Content="128"/>
-                                        <ComboBoxItem Content="160"/>
-                                        <ComboBoxItem Content="192" IsSelected="True"/>
-                                        <ComboBoxItem Content="256"/>
-                                        <ComboBoxItem Content="320"/>
-                                    </ComboBox>
-                                </StackPanel>
-
-                                <StackPanel Orientation="Horizontal" Margin="0,5,0,0">
-                                    <TextBlock Text="출력 포맷:" Width="80" VerticalAlignment="Center"/>
-                                    <ComboBox x:Name="cmbOutputExt" Width="80">
-                                        <ComboBoxItem Content=".m4a" IsSelected="True"/>
-                                        <ComboBoxItem Content=".mp3"/>
-                                        <ComboBoxItem Content=".flac"/>
-                                    </ComboBox>
-                                </StackPanel>
-                            </StackPanel>
-                        </GroupBox>
+                    <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,10">
+                        <Button Name="btnLoadImages" Content="이미지 파일 불러오기" Click="btnLoadImages_Click"
+                                Width="150" Height="30" Margin="0,0,10,0"/>
+                        <TextBlock Name="txtFileCount" Text="선택된 파일: 0개" VerticalAlignment="Center" Margin="10,0"/>
                     </StackPanel>
 
-                    <!-- Whisper 설정 영역 -->
-                    <GroupBox Header="Whisper 설정" Grid.Row="1" Margin="0,0,0,10">
-                        <StackPanel Orientation="Vertical" Margin="10">
-                            <StackPanel Orientation="Horizontal" Margin="0,5,0,0">
-                                <TextBlock Text="모델 선택:" VerticalAlignment="Center" Width="80"/>
-                                <ComboBox x:Name="cmbModel" Width="120">
-                                    <ComboBoxItem Content="base" IsSelected="True"/>
-                                    <ComboBoxItem Content="medium"/>
-                                    <ComboBoxItem Content="large"/>
+                    <GroupBox Grid.Row="2" Header="변환 설정" Padding="10" Margin="0,0,0,10">
+                        <StackPanel>
+                            <StackPanel Orientation="Horizontal" Margin="0,5">
+                                <TextBlock Text="대상 포맷:" Width="100" VerticalAlignment="Center"/>
+                                <ComboBox Name="cmbTargetFormat" Width="150" SelectedIndex="0">
+                                    <ComboBoxItem Content="PNG"/>
+                                    <ComboBoxItem Content="JPEG"/>
+                                    <ComboBoxItem Content="WEBP"/>
+                                    <ComboBoxItem Content="BMP"/>
                                 </ComboBox>
                             </StackPanel>
-                            <CheckBox x:Name="chkTimestamp" Content="타임스탬프 포함" Margin="0,5,0,0"/>
-                            <CheckBox x:Name="chkSpeaker" Content="화자 분리 (실험적)" Margin="0,5,0,0"/>
-                            <CheckBox x:Name="chkMarkdown" Content="서식화된 출력 (줄바꿈/마크다운)" Margin="0,5,0,0"/>
+                            <StackPanel Orientation="Horizontal" Margin="0,5">
+                                <TextBlock Text="품질 (1-100):" Width="100" VerticalAlignment="Center"/>
+                                <Slider Name="sliderQuality" Width="200" Minimum="1" Maximum="100" Value="90"
+                                       TickFrequency="10" IsSnapToTickEnabled="True" VerticalAlignment="Center"/>
+                                <TextBlock Text="{Binding ElementName=sliderQuality, Path=Value}"
+                                          Margin="10,0" VerticalAlignment="Center" Width="30"/>
+                            </StackPanel>
+                            <Button Name="btnConvertFormat" Content="변환 시작" Click="btnConvertFormat_Click"
+                                   Width="120" Height="30" Margin="0,10,0,0" HorizontalAlignment="Left"/>
                         </StackPanel>
                     </GroupBox>
 
-                    <!-- 텍스트 추출 및 저장 버튼 -->
-                    <StackPanel Orientation="Horizontal" Grid.Row="2" Margin="0,0,0,10">
-                        <Button Name="btnExtractText" Content="텍스트 추출 (Whisper)" Width="200" Height="30" Click="btnExtractText_Click" Margin="0,0,10,0"/>
-                        <Button Name="btnSaveText" Content="텍스트 저장" Width="150" Height="30" Click="btnSaveText_Click"/>
+                    <Border Grid.Row="3" BorderBrush="Gray" BorderThickness="1" Padding="10" Background="#F5F5F5">
+                        <ScrollViewer>
+                            <TextBlock Name="txtConversionStatus" Text="이미지 파일을 선택하고 변환 설정을 지정한 후 '변환 시작'을 클릭하세요."
+                                      TextWrapping="Wrap"/>
+                        </ScrollViewer>
+                    </Border>
+                </Grid>
+            </TabItem>
+
+            <!-- 영상 처리 탭 -->
+            <TabItem Header="영상 처리" Name="tabVideoProcessing">
+                <Grid Margin="20">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" Text="영상 처리 및 음성 추출" FontSize="18" FontWeight="Bold" Margin="0,0,0,20"/>
+
+                    <!-- 파일 선택 -->
+                    <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,15">
+                        <Button Name="btnLoadVideo" Content="영상 파일 불러오기" Click="btnLoadVideo_Click"
+                               Width="150" Height="30" Margin="0,0,10,0"/>
+                        <TextBlock Name="txtVideoFileName" Text="선택된 파일 없음" VerticalAlignment="Center" Margin="10,0"/>
                     </StackPanel>
 
-                    <!-- 추출된 텍스트 출력 영역 -->
-                    <TextBox x:Name="txtTranscript" Grid.Row="3" Margin="0" TextWrapping="Wrap" AcceptsReturn="True" VerticalScrollBarVisibility="Auto"/>
+                    <!-- 음성 추출 설정 -->
+                    <GroupBox Grid.Row="2" Header="음성 추출 설정" Padding="10" Margin="0,0,0,10">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="코덱:" Margin="0,5" VerticalAlignment="Center"/>
+                            <ComboBox Grid.Row="0" Grid.Column="1" Name="cmbCodec" Width="150" HorizontalAlignment="Left" Margin="10,5" SelectedIndex="0">
+                                <ComboBoxItem Content="AAC"/>
+                                <ComboBoxItem Content="MP3 (libmp3lame)"/>
+                                <ComboBoxItem Content="FLAC"/>
+                            </ComboBox>
+
+                            <TextBlock Grid.Row="1" Grid.Column="0" Text="비트레이트:" Margin="0,5" VerticalAlignment="Center"/>
+                            <ComboBox Grid.Row="1" Grid.Column="1" Name="cmbBitrate" Width="150" HorizontalAlignment="Left" Margin="10,5" SelectedIndex="4">
+                                <ComboBoxItem Content="64 kbps"/>
+                                <ComboBoxItem Content="96 kbps"/>
+                                <ComboBoxItem Content="128 kbps"/>
+                                <ComboBoxItem Content="160 kbps"/>
+                                <ComboBoxItem Content="192 kbps"/>
+                                <ComboBoxItem Content="256 kbps"/>
+                                <ComboBoxItem Content="320 kbps"/>
+                            </ComboBox>
+
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="출력 포맷:" Margin="0,5" VerticalAlignment="Center"/>
+                            <ComboBox Grid.Row="2" Grid.Column="1" Name="cmbOutputExt" Width="150" HorizontalAlignment="Left" Margin="10,5" SelectedIndex="0">
+                                <ComboBoxItem Content=".m4a"/>
+                                <ComboBoxItem Content=".mp3"/>
+                                <ComboBoxItem Content=".flac"/>
+                            </ComboBox>
+
+                            <Button Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="2" Name="btnExtractAudio"
+                                   Content="음성 추출" Click="btnExtractAudio_Click"
+                                   Width="120" Height="30" Margin="0,10,0,0" HorizontalAlignment="Left"/>
+                        </Grid>
+                    </GroupBox>
+
+                    <!-- Whisper 설정 -->
+                    <GroupBox Grid.Row="3" Header="Whisper 음성 인식 (선택사항)" Padding="10" Margin="0,0,0,10">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="모델:" Margin="0,5" VerticalAlignment="Center"/>
+                            <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" Margin="10,5">
+                                <ComboBox Name="cmbModel" Width="150" SelectedIndex="0">
+                                    <ComboBoxItem Content="base"/>
+                                    <ComboBoxItem Content="medium"/>
+                                    <ComboBoxItem Content="large"/>
+                                </ComboBox>
+                                <CheckBox Name="chkTimestamp" Content="타임스탬프 포함" Margin="20,0,0,0" VerticalAlignment="Center"/>
+                            </StackPanel>
+
+                            <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Margin="10,5">
+                                <CheckBox Name="chkSpeaker" Content="화자 분리 (실험적)" Margin="0,0,20,0" VerticalAlignment="Center"/>
+                                <CheckBox Name="chkMarkdown" Content="서식화된 출력" VerticalAlignment="Center"/>
+                            </StackPanel>
+
+                            <StackPanel Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2" Orientation="Horizontal" Margin="0,10,0,0">
+                                <Button Name="btnExtractText" Content="텍스트 추출 (Whisper)" Click="btnExtractText_Click"
+                                       Width="150" Height="30" Margin="0,0,10,0"/>
+                                <Button Name="btnSaveText" Content="텍스트 저장" Click="btnSaveText_Click"
+                                       Width="120" Height="30"/>
+                            </StackPanel>
+                        </Grid>
+                    </GroupBox>
+
+                    <!-- 출력 영역 -->
+                    <GroupBox Grid.Row="4" Header="추출된 텍스트" Padding="5">
+                        <TextBox Name="txtTranscript" TextWrapping="Wrap" AcceptsReturn="True"
+                                VerticalScrollBarVisibility="Auto" IsReadOnly="True"
+                                Background="#F5F5F5" FontFamily="Consolas"/>
+                    </GroupBox>
                 </Grid>
             </TabItem>
         </TabControl>
-
-        <!-- 하단 상태 표시 및 진행률 -->
-        <StackPanel Orientation="Horizontal" DockPanel.Dock="Bottom" Margin="10">
-            <TextBlock Name="txtStatus" VerticalAlignment="Center" Text="작업 상태 표시"/>
-            <ProgressBar x:Name="progressBar" Height="20" Width="200" Margin="20,0,0,0" Minimum="0" Maximum="100"/>
-        </StackPanel>
     </DockPanel>
 </Window>
